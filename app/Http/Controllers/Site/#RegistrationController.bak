@@ -1,0 +1,274 @@
+<?php
+
+namespace App\Http\Controllers\Site;
+
+use App\Helpers\BkashHelper;
+use App\Helpers\NotificationHelper;
+use App\Models\GeoDivision;
+use App\User;
+use GuzzleHttp\Client;
+use App\Models\GeoUnion;
+use App\Models\GeoUpazila;
+use App\Models\GeoDistrict;
+use Illuminate\Http\Request;
+use App\Models\Registration;
+use App\Helpers\UploadHelper;
+use App\Http\Controllers\Controller;
+use App\Notifications\WelcomeMember;
+use Illuminate\Support\Facades\Session;
+
+class RegistrationController extends Controller
+{
+    use UploadHelper, BkashHelper, NotificationHelper;
+    protected $form_groups;
+    protected $full_form_groups;
+    protected $form_validations;
+
+    public function __construct()
+    {
+        $this->form_groups = config('cms.registration.shortForm');
+        unset($this->form_groups[3]);
+        $this->full_form_groups = config('cms.registration.form');
+    }
+
+    public function index()
+    {
+        $form_groups = json_decode(json_encode($this->form_groups));
+
+        return view('site.' . config('cms.theme') . '.registration.index', compact('form_groups'));
+    }
+
+    public function store(Request $request)
+    {
+        // form validation
+        $form_groups = $this->form_groups;
+        $rules = $this->getRulesArray($form_groups);
+
+        // validating request
+        $request->validate($rules);
+    
+        // add code property
+        $request->request->add(['code', '']);
+
+        // retrieve basic info
+        $basic_info = $request->except(['email', 'phone', 'password', 'password_confirmation', '_token']);
+    
+        // set geo data
+        if ($request->has('geo_district_id')) {
+            $district = GeoDistrict::find($request->geo_district_id);
+            $basic_info['geo_district_id'] = $district->name_bng;
+            $basic_info['district_code'] = $district->code;
+        }
+
+        // image
+        $image = '';
+
+        // file upload
+        foreach ($this->full_form_groups as $form_group) {
+            foreach ($form_group['fields'] as $field) {
+                if ($request->has($field['field'])) {
+                    if ($field['type'] == 'file') {
+                        if ($request->has($field['field'])) {
+                            // upload file
+                            $file = $this->uploadData($request, $field['field']);
+                            $image = $file;
+                            $basic_info[$field['field']] = $file;
+                        } else {
+                            $image = NULL;
+                            $basic_info[$field['field']] = '';
+                        }
+                    } else {
+                        $basic_info[$field['field']] = $request->{$field['field']};
+                    }
+                } else {
+                    $basic_info[$field['field']] = '';
+                }
+            }
+        }
+    
+        // set geo data
+        if ($request->has('geo_division_id')) {
+            $basic_info['geo_division_id'] = GeoDivision::find($request->geo_division_id)->name_bng;
+        } else {
+            $basic_info['geo_division_id'] = NULL;
+        }
+        if ($request->has('geo_district_id')) {
+            $district = GeoDistrict::find($request->geo_district_id);
+            $basic_info['geo_district_id'] = $district->name_bng;
+            $basic_info['district_code'] = $district->code;
+            $request->district_code = $district->code;
+        } else {
+            $basic_info['geo_district_id'] = NULL;
+        }
+        if ($request->has('geo_upazila_id')) {
+            $basic_info['geo_upazila_id'] = GeoUpazila::find($request->geo_upazila_id)->name_bng;
+        } else {
+            $basic_info['geo_upazila_id'] = NULL;
+        }
+        if ($request->has('geo_union_id') && $request->get('geo_union_id') != null) {
+            $basic_info['geo_union_id'] = GeoUnion::find($request->geo_union_id)->name_bng;
+        } else {
+            $basic_info['geo_union_id'] = NULL;
+        }
+        
+        // generate code
+        $code = 50001;
+        $registration = Registration::latest()->first();
+        if (!empty($registration)) {
+            $code = $registration->code + 1;
+        }
+
+        // registration data array
+        $registration_data['code'] = $code;
+        $registration_data['reg_code'] = $request->district_code . $code;
+        $registration_data['name'] = $request->name;
+        $registration_data['data'] = json_encode($basic_info);
+        $registration_data['phone'] = $request->phone;
+        $registration_data['geo_division_id'] = $request->geo_division_id;
+        $registration_data['geo_district_id'] = $request->geo_district_id;
+        $registration_data['geo_upazila_id'] = $request->geo_upazila_id;
+        $registration_data['geo_union_id'] = $request->geo_union_id;
+        $registration_data['temp_password'] = $request->password;
+        $registration_data['image'] = $image;
+
+        // proceed registration
+        $registration = Registration::create($registration_data);
+
+        // registering users
+        if (config('cms.registration.user')) {
+            $this->userRegistration($request, $registration, $image);
+        }
+
+        // flash notification
+        Session::flash('success', 'Form submitted successfully!');
+
+        // process payment
+        if (config('cms.registration.payment')) {
+            // redirecting to next page
+            return redirect()->to('/registration/payment?code='.$registration_data['code']);
+        } else {
+            // redirecting
+            return redirect()->back();
+        }
+    }
+
+    public function getRulesArray($form_groups)
+    {
+        $rules = [];
+        foreach ($form_groups as $form_group) {
+            foreach ($form_group['fields'] as $field) {
+                $rules[$field['field']] = $field['rules'];
+            }
+        }
+        return $rules;
+    }
+
+    private function uploadData($request, $file)
+    {
+        $data = $request->{$file};
+        $path = $file;
+        $prefix = $file;
+        $file = $this->uploadFile($data, $path, $prefix);
+        return $file;
+    }
+
+    public function userRegistration($request, $registration, $image)
+    {
+        // retrieving account info
+        $account_info = $request->only(['name', 'email', 'phone', 'password', 'password_confirmation']);
+
+        // creating user
+        $user = User::create([
+            'name' => $account_info['name'],
+            'email' => isset($account_info['email']) ? $account_info['email'] : $account_info['phone'],
+            'phone' => $account_info['phone'],
+            'password' => bcrypt($account_info['password']),
+            'image' => $image
+        ]);
+
+        // update registration user id
+        $registration->user_id = $user->id;
+        $registration->update();
+        
+        $district_code = GeoDistrict::find($request->geo_district_id)->code;
+
+        if (!config('cms.registration.payment')) {
+            // send sms notification
+            if (config('cms.registration.sms')) {
+                $body = "Congratulation, Your Registration has been successful. Your Reg. Code No Is {$registration->reg_code}.\nThanks by\nTeam PKCSBD";
+                $this->sendSmsNotification($user, $body);
+            }
+            // send email notification
+            if (config('cms.registration.email')) {
+                $body = "Congratulation, Your Registration has been successful. Your Reg. Code No Is {$registration->reg_code}.\nThanks by\nTeam PKCSBD";
+                $this->sendEmailNotification($user, $body);
+            }
+        }
+    }
+
+    public function payment()
+    {
+        $this->initializeBkashSetting();
+
+        if (request()->get('code')) {
+            $code = request()->get('code');
+            $registration = Registration::where('code', $code)->firstOrFail();
+            if ($registration->payment) {
+                return redirect()->route('site.registration.successful');
+            }
+            return view('site.' . config('cms.theme') . '.registration.payment', compact('code'));
+        } else {
+            return redirect()->to('registration');
+        }
+    }
+    
+    public function createPayment(Request $request)
+    {
+        $this->initializeBkashSetting();
+        return response()->json($this->createPaymentRequest($request->code));
+    }
+
+    public function paymentStore(Request $request)
+    {
+        $code = $request->code;
+        $payment_id = $request->paymentID;
+        $payment = $this->executePaymentRequest($payment_id);
+        if (!isset($payment->errorCode)) {
+            $registration = Registration::where('code', $code)->first();
+            if (!empty($registration)) {
+                $registration->payment = 1;
+                $registration->approved = 1;
+                $registration->payment_type = 'Bkash';
+                $registration->amount = $payment->amount;
+                $registration->transaction_id = $payment->trxID;
+                $registration->payment_id = $payment->paymentID;
+                $registration->payment_data = json_encode($payment);
+                $registration->update();
+            }
+            $user = User::find($registration->user_id);
+            $user->approved = 1;
+            $user->update();
+            if (!empty($user)) {
+                // send sms notification
+                $body = "Congratulation, Your Registration has been successful. Your Reg. Code No Is {$registration->reg_code}.\nThanks by\nTeam PKCSBD";
+                $this->sendSmsNotification($user, $body);
+            }
+            $this->queryPaymentRequest($payment_id);
+            $this->searchPaymentRequest($payment_id);
+            return response()->json([
+                'status' => 'success',
+                'message' => "Congratulation, Your Registration has been successful. Your Reg. Code No Is {$registration->reg_code}.",
+                'paymentID' => $request->paymentID
+            ]);
+        } else {
+            return response()->json([
+                'status' => 'error',
+                'message' => $payment->errorMessage
+            ]);
+        }
+    }
+
+    public function successful() {
+        return view('site.' . config('cms.theme') . '.registration.successful');
+    }
+}

@@ -1,0 +1,26 @@
+/*
+|--------------------------------------------------------------------------
+|  Custom Styles
+|  
+|--------------------------------------------------------------------------
+|
+| 
+|
+*/
+
+/* If you want to add your own CSS code, please do it in this file */
+/*
+@media only screen and (max-width: 767px) 
+{
+	.no-margin-h .one-fourth.column{ width: 50% !important;clear:none; }		
+	.one-fourth.column{ width: 50% !important;clear:none;  }		
+}*/
+
+@media only screen and (max-width: 767px){
+.caroufredsel_wrapper{width: 90% !important;margin: auto !important;}}
+@media only screen and (max-width: 767px){
+.caroufredsel_wrapper ul.offer_ul li, .caroufredsel_wrapper ul.offer_ul{width: 100% !important;}}
+
+
+
+

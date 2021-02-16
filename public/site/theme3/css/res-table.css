@@ -1,0 +1,87 @@
+.job-tble table { 
+		width: 100%; 
+		border-collapse: collapse; 
+	}
+	/* Zebra striping */
+	.job-tble  tr:nth-of-type(odd) { 
+		background: #eee; 
+	}
+	.job-tble th { 
+		background: #dcdcdc; 
+		color: #333; 
+		font-weight: bold; 
+	}
+	.job-tble td, .job-tble th { 
+		padding: 6px; 
+		border: 1px solid #ccc; 
+		text-align: left; 
+	}
+
+
+@media only screen and (max-width: 760px),
+	(min-device-width: 768px) and (max-device-width: 1024px)  {
+	
+		/* Force table to not be like tables anymore */
+		.job-tble table, .job-tble thead, .job-tble tbody, .job-tble th, .job-tble td, .job-tble tr { 
+			display: block; 
+		}
+		
+		/* Hide table headers (but not display: none;, for accessibility) */
+		.job-tble thead tr { 
+			position: absolute;
+			top: -9999px;
+			left: -9999px;
+		}
+		
+		.job-tble tr { border: 1px solid #ccc; }
+		
+		.job-tble td { 
+			/* Behave  like a "row" */
+			border: none;
+			border-bottom: 1px solid #eee; 
+			position: relative;
+			padding-left: 50%; 
+		}
+		
+		.job-tble td:before { 
+			/* Now like a table header */
+			position: absolute;
+			/* Top/left values mimic padding */
+			top: 6px;
+			left: 6px;
+			width: 45%; 
+			padding-right: 10px; 
+			white-space: nowrap;
+		}
+		
+		/*
+		Label the data
+		*/
+		.job-tble td:nth-of-type(1):before { content: "S.N."; }
+		.job-tble td:nth-of-type(2):before { content: "Job Title"; }
+		.job-tble td:nth-of-type(3):before { content: "Quantity"; }
+		.job-tble td:nth-of-type(4):before { content: "Company"; }
+		.job-tble td:nth-of-type(5):before { content: "Country"; }
+		.job-tble td:nth-of-type(6):before { content: "Basic Salary"; }
+		.job-tble td:nth-of-type(7):before { content: "Food"; }
+		.job-tble td:nth-of-type(8):before { content: "Posted Date"; }
+		.job-tble td:nth-of-type(8):before { content: "Apply"; }
+	}
+	
+	/* Smartphones (portrait and landscape) ----------- */
+	@media only screen
+	and (min-device-width : 320px)
+	and (max-device-width : 480px) {
+		.job-tble table { 
+			padding: 0; 
+			margin: 0; 
+			width: 320px; }
+		}
+	
+	/* iPads (portrait and landscape) ----------- */
+	@media only screen and (min-device-width: 768px) and (max-device-width: 1024px) {
+		.job-tble table { 
+			width: 495px; 
+		}
+	}
+	

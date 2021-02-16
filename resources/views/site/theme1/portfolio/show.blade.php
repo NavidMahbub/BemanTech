@@ -1,0 +1,54 @@
+@extends('site.' . config('cms.theme') . '.layout.master')
+
+@section('title', config('cms.site') . ' - Portfolio')
+
+@section('content')
+
+    {{--page cover--}}
+    <div class="breadcrumb-area bg-color ptb-100">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="breadcrumb-title text-center">
+                        <h1>{!! $post->title !!}</h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{--page body--}}
+    <div class="blog-area ptb-80">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-9 col-sm-12">
+                    @if($post->image)
+                        <div class="blog-content-area" style="width: 100%; height: 300px; background-image: url({{ $post->image ? $post->image : asset('image/placeholder.jpg') }}); background-repeat: no-repeat; background-size: cover; background-position: center;"></div>
+                    @endif
+                    <div class="blog-content-area mt-30">
+                        {!! $post->body !!}
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-12 mt-sm-50">
+                    <div class="blog-widget">
+                        <div class="widget-title">
+                            <h3>Portfolio</h3>
+                        </div>
+                        <ul class="list-item">
+                            @foreach($list as $item)
+                                <li><a href="{{ route('site.portfolio.show', ['slug' => $item->slug]) }}">{{ $item->title }}</a></li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@stop
+
+@section('style')
+@stop
+
+@section('script')
+@stop
